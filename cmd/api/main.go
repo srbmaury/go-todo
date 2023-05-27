@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/srbmaury/go-todo/routes"
+	"Demo/router"
 )
 
 func main() {
-	r := routes.SetupRouter()
+	r := router.SetupRouter()
 	r.Run("localhost:8080")
 }
