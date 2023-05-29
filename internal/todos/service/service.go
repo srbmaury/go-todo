@@ -1,8 +1,8 @@
 package todosService
 
 import (
-	contextapi "Demo/context"
-	todoModels "Demo/internal/todos/models"
+	contextapi "Todos/context"
+	todoModels "Todos/internal/todos/models"
 	"net/http"
 	"time"
 

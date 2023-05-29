@@ -1,9 +1,9 @@
 package main
 
 import (
-	"Demo/config"
-	context "Demo/context"
-	"Demo/router"
+	"Todos/config"
+	context "Todos/context"
+	"Todos/router"
 	"log"
 )
 

@@ -1,9 +1,9 @@
 package router
 
 import (
-	todosService "Demo/internal/todos/service"
-	userService "Demo/internal/users/service"
-	middlewares "Demo/middlewares"
+	todosService "Todos/internal/todos/service"
+	userService "Todos/internal/users/service"
+	middlewares "Todos/middlewares"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

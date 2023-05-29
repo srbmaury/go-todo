@@ -1,8 +1,8 @@
 package config
 
 import (
-	todoModels "Demo/internal/todos/models"
-	userModels "Demo/internal/users/models"
+	todoModels "Todos/internal/todos/models"
+	userModels "Todos/internal/users/models"
 	"fmt"
 	"log"
 

@@ -1,7 +1,7 @@
 package userService
 
 import (
-	userModels "Demo/internal/users/models"
+	userModels "Todos/internal/users/models"
 	"net/http"
 	"time"
 

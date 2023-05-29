@@ -1,8 +1,8 @@
 package userModels
 
 import (
-	contextapi "Demo/context"
-	"Demo/utils/token"
+	contextapi "Todos/context"
+	"Todos/utils/token"
 	"html"
 	"strconv"
 	"strings"
