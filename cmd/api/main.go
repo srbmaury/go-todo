@@ -2,6 +2,7 @@ package main
 
 import (
 	"Demo/config"
+	context "Demo/context"
 	"Demo/router"
 	"log"
 )
@@ -17,6 +18,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	context.CreateContext()
 	r := router.SetupRouter(db)
 	r.Run("localhost:8080")
 }

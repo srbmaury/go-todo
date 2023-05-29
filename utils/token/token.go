@@ -26,8 +26,7 @@ func GenerateToken(user_id uint) (string, error) {
 	claims["exp"] = time.Now().Add(time.Hour * time.Duration(token_lifespan)).Unix()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	return token.SignedString([]byte(os.Getenv("srbmaury")))
-	// return token.SignedString([]byte(os.Getenv("API_SECRET")))
+	return token.SignedString([]byte(os.Getenv("API_SECRET")))
 
 }
 

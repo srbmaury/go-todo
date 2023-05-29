@@ -1,8 +1,10 @@
 package userModels
 
 import (
+	contextapi "Demo/context"
 	"Demo/utils/token"
 	"html"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/bcrypt"
@@ -61,6 +63,8 @@ func LoginCheck(username string, password string, db *gorm.DB) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	var uid contextapi.MyContextKey
 
+	contextapi.SetValue(uid, strconv.FormatUint(uint64(u.ID), 10))
 	return token, nil
 }

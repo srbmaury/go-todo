@@ -1,6 +1,7 @@
 package todosService
 
 import (
+	contextapi "Demo/context"
 	todoModels "Demo/internal/todos/models"
 	"net/http"
 	"time"
@@ -9,117 +10,146 @@ import (
 	"gorm.io/gorm"
 )
 
-func PostTodo(c *gin.Context, db *gorm.DB) {
-	var newTodo todoModels.Todo
+func PostTodo(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
 
-	if err := c.ShouldBindJSON(&newTodo); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		var uid contextapi.MyContextKey
+		userId := contextapi.GetValue(uid)
+
+		var newTodo todoModels.Todo
+
+		if err := c.ShouldBindJSON(&newTodo); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := db.AutoMigrate(&todoModels.Todo{}); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to migrate Todo table"})
+			return
+		}
+		newTodo.CreatedAt = time.Now().Format("01-02-2006 15:04:05")
+		newTodo.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
+		newTodo.UserId = userId
+
+		if err := db.Create(&newTodo).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create todo"})
+			return
+		}
+
+		c.JSON(http.StatusCreated, gin.H{"message": "Todo created"})
 	}
-
-	if err := db.AutoMigrate(&todoModels.Todo{}); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to migrate Todo table"})
-		return
-	}
-
-	newTodo.CreatedAt = time.Now().Format("01-02-2006 15:04:05")
-	newTodo.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
-
-	if err := db.Create(&newTodo).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create todo"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{"message": "Todo created"})
 }
 
-func GetTodos(c *gin.Context, db *gorm.DB) {
-	var todos []todoModels.Todo
+func GetTodos(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var uid contextapi.MyContextKey
+		userId := contextapi.GetValue(uid)
 
-	if err := db.Find(&todos).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get todos"})
-		return
+		var todos []todoModels.Todo
+
+		if err := db.Where("user_id = ?", userId).Find(&todos).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get todos"})
+			return
+		}
+
+		c.JSON(http.StatusOK, todos)
 	}
-
-	c.JSON(http.StatusOK, todos)
 }
 
-func GetTodo(c *gin.Context, db *gorm.DB) {
-	todoID := c.Param("id")
+func GetTodo(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var uid contextapi.MyContextKey
+		userId := contextapi.GetValue(uid)
 
-	var todo todoModels.Todo
-	if err := db.First(&todo, todoID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
-		return
+		todoID := c.Param("id")
+
+		var todo todoModels.Todo
+		if err := db.Where("user_id = ?", userId).First(&todo, todoID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
+			return
+		}
+
+		c.JSON(http.StatusOK, todo)
 	}
-
-	c.JSON(http.StatusOK, todo)
 }
 
-func UpdateTodo(c *gin.Context, db *gorm.DB) {
-	todoID := c.Param("id")
+func UpdateTodo(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var uid contextapi.MyContextKey
+		userId := contextapi.GetValue(uid)
 
-	var todo todoModels.Todo
-	if err := db.First(&todo, todoID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
-		return
+		todoID := c.Param("id")
+
+		var todo todoModels.Todo
+		if err := db.Where("user_id = ?", userId).First(&todo, todoID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
+			return
+		}
+
+		var updatedTodo todoModels.Todo
+		if err := c.ShouldBindJSON(&updatedTodo); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		todo.Title = updatedTodo.Title
+		todo.Description = updatedTodo.Description
+		todo.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
+
+		if err := db.Save(&todo).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update todo"})
+			return
+		}
+
+		c.JSON(http.StatusOK, todo)
 	}
-
-	var updatedTodo todoModels.Todo
-	if err := c.ShouldBindJSON(&updatedTodo); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	todo.Title = updatedTodo.Title
-	todo.Description = updatedTodo.Description
-	todo.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
-
-	if err := db.Save(&todo).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update todo"})
-		return
-	}
-
-	c.JSON(http.StatusOK, todo)
 }
 
-func PartiallyUpdateTodo(c *gin.Context, db *gorm.DB) {
-	todoID := c.Param("id")
+func PartiallyUpdateTodo(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var uid contextapi.MyContextKey
+		userId := contextapi.GetValue(uid)
+		todoID := c.Param("id")
 
-	var todo todoModels.Todo
-	if err := db.First(&todo, todoID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
-		return
+		var todo todoModels.Todo
+		if err := db.Where("user_id = ?", userId).First(&todo, todoID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
+			return
+		}
+
+		var updatedData map[string]interface{}
+
+		if err := c.ShouldBindJSON(&updatedData); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		updatedData["UpdatedAt"] = time.Now().Format("01-02-2006 15:04:05")
+		if err := db.Model(&todo).Updates(updatedData).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update todo"})
+			return
+		}
+
+		c.JSON(http.StatusOK, todo)
 	}
-
-	var updatedData map[string]interface{}
-
-	if err := c.ShouldBindJSON(&updatedData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	updatedData["UpdatedAt"] = time.Now().Format("01-02-2006 15:04:05")
-	if err := db.Model(&todo).Updates(updatedData).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update todo"})
-		return
-	}
-
-	c.JSON(http.StatusOK, todo)
 }
 
-func DeleteTodo(c *gin.Context, db *gorm.DB) {
-	todoID := c.Param("id")
+func DeleteTodo(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var uid contextapi.MyContextKey
+		userId := contextapi.GetValue(uid)
+		todoID := c.Param("id")
 
-	var todo todoModels.Todo
-	if err := db.First(&todo, todoID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
-		return
+		var todo todoModels.Todo
+		if err := db.Where("user_id = ?", userId).First(&todo, todoID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
+			return
+		}
+
+		if err := db.Delete(&todo).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete todo"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Todo deleted"})
 	}
-
-	if err := db.Delete(&todo).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete todo"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Todo deleted"})
 }

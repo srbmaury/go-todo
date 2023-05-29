@@ -14,30 +14,32 @@ type RegisterInput struct {
 	Password string `json:"password" binding:"required"`
 }
 
-func Register(c *gin.Context, db *gorm.DB) {
+func Register(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
 
-	var user userModels.User
+		var user userModels.User
 
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		if err := c.ShouldBindJSON(&user); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		u := userModels.User{}
+		u.Username = user.Username
+		u.Password = user.Password
+		u.CreatedAt = time.Now().Format("01-02-2006 15:04:05")
+		u.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
+
+		user.BeforeSave()
+		_, err := user.SaveUser(db)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "registration success"})
 	}
-
-	u := userModels.User{}
-	u.Username = user.Username
-	u.Password = user.Password
-	u.CreatedAt = time.Now().Format("01-02-2006 15:04:05")
-	u.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
-
-	user.BeforeSave()
-	_, err := user.SaveUser(db)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "registration success"})
 }
 
 type LoginInput struct {
@@ -45,25 +47,27 @@ type LoginInput struct {
 	Password string `json:"password" binding:"required"`
 }
 
-func Login(c *gin.Context, db *gorm.DB) {
-	var input LoginInput
+func Login(db *gorm.DB) func(c *gin.Context) {
+	return func(c *gin.Context) {
+		var input LoginInput
 
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		if err := c.ShouldBindJSON(&input); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		u := userModels.User{}
+
+		u.Username = input.Username
+		u.Password = input.Password
+
+		token, err := userModels.LoginCheck(u.Username, u.Password, db)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "username or password is incorrect."})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"token": token})
 	}
-
-	u := userModels.User{}
-
-	u.Username = input.Username
-	u.Password = input.Password
-
-	token, err := userModels.LoginCheck(u.Username, u.Password, db)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "username or password is incorrect."})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"token": token})
 }
