@@ -3,132 +3,123 @@ package todosService
 import (
 	todoModels "Demo/internal/todos/models"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	uuid "github.com/satori/go.uuid"
+	"gorm.io/gorm"
 )
 
-var todos = []todoModels.Todo{}
-
-func PostTodo(c *gin.Context) {
+func PostTodo(c *gin.Context, db *gorm.DB) {
 	var newTodo todoModels.Todo
 
 	if err := c.ShouldBindJSON(&newTodo); err != nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	newTodo.ID = uuid.NewV4()
-	todos = append(todos, newTodo)
-	c.IndentedJSON(http.StatusCreated, "Todo created")
+	if err := db.AutoMigrate(&todoModels.Todo{}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to migrate Todo table"})
+		return
+	}
+
+	newTodo.CreatedAt = time.Now().Format("01-02-2006 15:04:05")
+	newTodo.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
+
+	if err := db.Create(&newTodo).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create todo"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Todo created"})
 }
 
-func GetTodos(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, todos)
+func GetTodos(c *gin.Context, db *gorm.DB) {
+	var todos []todoModels.Todo
+
+	if err := db.Find(&todos).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get todos"})
+		return
+	}
+
+	c.JSON(http.StatusOK, todos)
 }
 
-func GetTodo(c *gin.Context) {
-	id := c.Param("id")
-	parsedID := uuid.FromStringOrNil(id)
+func GetTodo(c *gin.Context, db *gorm.DB) {
+	todoID := c.Param("id")
 
-	if parsedID == uuid.Nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"msg": "Invalid UUID"})
+	var todo todoModels.Todo
+	if err := db.First(&todo, todoID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
 		return
 	}
 
-	for _, a := range todos {
-		if a.ID == parsedID {
-			c.IndentedJSON(http.StatusOK, a)
-			return
-		}
-	}
-
-	c.IndentedJSON(http.StatusNotFound, gin.H{"msg": "Todo not found"})
+	c.JSON(http.StatusOK, todo)
 }
 
-func UpdateTodo(c *gin.Context) {
-	id := c.Param("id")
+func UpdateTodo(c *gin.Context, db *gorm.DB) {
+	todoID := c.Param("id")
 
-	var updateData todoModels.Todo
-
-	parsedID := uuid.FromStringOrNil(id)
-	if parsedID == uuid.Nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"msg": "Invalid UUID"})
+	var todo todoModels.Todo
+	if err := db.First(&todo, todoID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
 		return
 	}
 
-	if err := c.ShouldBindJSON(&updateData); err != nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	for i, todo := range todos {
-		if todo.ID == parsedID {
-			todos[i].Title = updateData.Title
-			todos[i].Description = updateData.Description
-			c.IndentedJSON(http.StatusOK, todos[i])
-			return
-		}
-	}
-
-	c.IndentedJSON(http.StatusNotFound, gin.H{"msg": "Todo not found"})
-}
-
-func PartiallyUpdateTodo(c *gin.Context) {
-	id := c.Param("id")
-
-	parsedID := uuid.FromStringOrNil(id)
-	if parsedID == uuid.Nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"msg": "Invalid UUID"})
-		return
-	}
-
-	var updatedTodo struct {
-		Title       *string `json:"title"`
-		Description *string `json:"description"`
-	}
-
+	var updatedTodo todoModels.Todo
 	if err := c.ShouldBindJSON(&updatedTodo); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	for i, todo := range todos {
-		if todo.ID == parsedID {
-			if updatedTodo.Title != nil {
-				todos[i].Title = *updatedTodo.Title
-			}
-			if updatedTodo.Description != nil {
-				todos[i].Description = *updatedTodo.Description
-			}
+	todo.Title = updatedTodo.Title
+	todo.Description = updatedTodo.Description
+	todo.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
 
-			c.JSON(http.StatusOK, todos[i])
-			return
-		}
-	}
-
-	c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
-}
-
-func RemoveIndex(s []todoModels.Todo, index int) []todoModels.Todo {
-	return append(s[:index], s[index+1:]...)
-}
-func DeleteTodo(c *gin.Context) {
-	id := c.Param("id")
-
-	parsedID := uuid.FromStringOrNil(id)
-	if parsedID == uuid.Nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"msg": "Invalid UUID"})
+	if err := db.Save(&todo).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update todo"})
 		return
 	}
 
-	for i, todo := range todos {
-		if todo.ID == parsedID {
-			todos = RemoveIndex(todos, i)
-			c.IndentedJSON(http.StatusOK, "Deleted Successfully")
-			return
-		}
+	c.JSON(http.StatusOK, todo)
+}
+
+func PartiallyUpdateTodo(c *gin.Context, db *gorm.DB) {
+	todoID := c.Param("id")
+
+	var todo todoModels.Todo
+	if err := db.First(&todo, todoID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
+		return
 	}
 
-	c.IndentedJSON(http.StatusNotFound, gin.H{"msg": "Todo not found"})
+	var updatedData map[string]interface{}
+
+	if err := c.ShouldBindJSON(&updatedData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	updatedData["UpdatedAt"] = time.Now().Format("01-02-2006 15:04:05")
+	if err := db.Model(&todo).Updates(updatedData).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update todo"})
+		return
+	}
+
+	c.JSON(http.StatusOK, todo)
+}
+
+func DeleteTodo(c *gin.Context, db *gorm.DB) {
+	todoID := c.Param("id")
+
+	var todo todoModels.Todo
+	if err := db.First(&todo, todoID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Todo not found"})
+		return
+	}
+
+	if err := db.Delete(&todo).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete todo"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Todo deleted"})
 }
