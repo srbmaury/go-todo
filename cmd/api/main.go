@@ -14,10 +14,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	context.CreateContext()
 	r := router.SetupRouter(db)
 	r.Run("localhost:8080")

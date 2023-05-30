@@ -24,11 +24,8 @@ func Register(db *gorm.DB) func(c *gin.Context) {
 			return
 		}
 
-		u := userModels.User{}
-		u.Username = user.Username
-		u.Password = user.Password
-		u.CreatedAt = time.Now().Format("01-02-2006 15:04:05")
-		u.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
+		user.CreatedAt = time.Now().Format("01-02-2006 15:04:05")
+		user.UpdatedAt = time.Now().Format("01-02-2006 15:04:05")
 
 		user.BeforeSave()
 		_, err := user.SaveUser(db)
